@@ -392,7 +392,7 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
   return 0;
 }
 
-static int checkaddress(int addr, int len, uint vlimit){
+static int checkAddr(int addr, int len, uint vlimit){
   // check if addr is part of address space or not
   if(len <= 0 || vlimit < (int)addr + (len * PGSIZE)){
     cprintf("\ninvalid len\n");
@@ -412,7 +412,7 @@ int
 mprotect(void *addr, int len){
   struct proc *currentproc = myproc();
   // check addr points if it is not apart of address space and is not page aligned
-  if (checkaddress((int)addr, len, currentproc->vlimit) == -1){
+  if (checkAddr((int)addr, len, currentproc->vlimit) == -1){
     return -1;
   }
 
@@ -440,7 +440,7 @@ int
 munprotect(void *addr, int len){
   struct proc *currentproc = myproc();
   // check addr points if it is not apart of address space and is not page aligned
-  if (checkaddress((int)addr, len, currentproc->vlimit) == -1){
+  if (checkAddr((int)addr, len, currentproc->vlimit) == -1){
     return -1;
   }
 

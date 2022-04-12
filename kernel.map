@@ -887,7 +887,7 @@ OUTPUT(kernel elf32-i386)
  .debug_aranges
                 0x0000000000000388       0x28 vm.o
 
-.debug_str      0x0000000000000000      0xe03
+.debug_str      0x0000000000000000      0xe00
  .debug_str     0x0000000000000000       0x36 entry.o
  .debug_str     0x0000000000000036      0x17d bio.o
                                         0x1ae (size before relaxing)
@@ -940,8 +940,8 @@ OUTPUT(kernel elf32-i386)
                                         0x139 (size before relaxing)
  .debug_str     0x0000000000000d72        0xa vectors.o
                                          0x38 (size before relaxing)
- .debug_str     0x0000000000000d7c       0x87 vm.o
-                                        0x403 (size before relaxing)
+ .debug_str     0x0000000000000d7c       0x84 vm.o
+                                        0x400 (size before relaxing)
 
 .debug_loclists
                 0x0000000000000000     0x54b4
