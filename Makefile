@@ -185,12 +185,14 @@ UPROGS := \
 	_ln\
 	_ls\
 	_mkdir\
+	_protect_test\
 	_rm\
 	_sh\
 	_stressfs\
 	_usertests\
 	_wc\
 	_zombie\
+	
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)

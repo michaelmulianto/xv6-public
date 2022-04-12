@@ -204,20 +204,20 @@ inituvm(pde_t *pgdir, char *init, uint sz)
 int
 loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
 {
-  uint i, pa, n;
+  uint vir, pa, n;
   pte_t *pte;
 
   if((uint) addr % PGSIZE != 0)
     panic("loaduvm: addr must be page aligned");
-  for(i = 0; i < sz; i += PGSIZE){
-    if((pte = walkpgdir(pgdir, addr+i, 0)) == 0)
+  for(vir = 0; vir < sz; vir += PGSIZE){
+    if((pte = walkpgdir(pgdir, addr+vir, 0)) == 0)
       panic("loaduvm: address should exist");
     pa = PTE_ADDR(*pte);
-    if(sz - i < PGSIZE)
-      n = sz - i;
+    if(sz - vir < PGSIZE)
+      n = sz - vir;
     else
       n = PGSIZE;
-    if(readi(ip, P2V(pa), offset+i, n) != n)
+    if(readi(ip, P2V(pa), offset+vir, n) != n)
       return -1;
   }
   return 0;
@@ -290,14 +290,14 @@ deallocuvm(pde_t *pgdir, uint oldvlimit, uint newvlimit)
 void
 freevm(pde_t *pgdir)
 {
-  uint i;
+  uint vir;
 
   if(pgdir == 0)
     panic("freevm: no pgdir");
   deallocuvm(pgdir, KERNBASE, 0);
-  for(i = 0; i < NPDENTRIES; i++){
-    if(pgdir[i] & PTE_P){
-      char * v = P2V(PTE_ADDR(pgdir[i]));
+  for(vir = 0; vir < NPDENTRIES; vir++){
+    if(pgdir[vir] & PTE_P){
+      char * v = P2V(PTE_ADDR(pgdir[vir]));
       kfree(v);
     }
   }
@@ -324,13 +324,13 @@ copyuvm(pde_t *pgdir, uint vbase, uint vlimit)
 {
   pde_t *d;
   pte_t *pte;
-  uint pa, i, flags;
+  uint pa, vir, flags;
   char *mem;
 
   if((d = setupkvm()) == 0)
     return 0;
-  for(i = PGSIZE; i < vlimit; i += PGSIZE){
-    if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
+  for(vir = PGSIZE; vir < vlimit; vir += PGSIZE){
+    if((pte = walkpgdir(pgdir, (void *) vir, 0)) == 0)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))
       panic("copyuvm: page not present");
@@ -339,7 +339,7 @@ copyuvm(pde_t *pgdir, uint vbase, uint vlimit)
     if((mem = kalloc()) == 0)
       goto bad;
     memmove(mem, (char*)P2V(pa), PGSIZE);
-    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0) {
+    if(mappages(d, (void*)vir, PGSIZE, V2P(mem), flags) < 0) {
       kfree(mem);
       goto bad;
     }
@@ -389,6 +389,77 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
     buf += n;
     va = va0 + PGSIZE;
   }
+  return 0;
+}
+
+static int checkaddress(int addr, int len, uint vlimit){
+  // check if addr is part of address space or not
+  if(len <= 0 || vlimit < (int)addr + (len * PGSIZE)){
+    cprintf("\ninvalid len\n");
+    return -1;
+  }
+
+  // check if addr is page aligned
+  if((int)(((int) addr) % PGSIZE )  != 0){
+    cprintf("\ninvalid addr %p\n", addr);
+    return -1;
+  }
+  return 0;
+}
+
+// makes PTE readable and non-writable
+int
+mprotect(void *addr, int len){
+  struct proc *currentproc = myproc();
+  // check addr points if it is not apart of address space and is not page aligned
+  if (checkaddress((int)addr, len, currentproc->vlimit) == -1){
+    return -1;
+  }
+
+  pte_t *pte;
+  int vir;
+  // page loop
+  for (vir = (int) addr; vir < ((int) addr + (len) *PGSIZE); vir+= PGSIZE){
+    // get the PTE address in current process's pgdir that corresponds to virtual address
+    pte = walkpgdir(currentproc->pgdir,(void*) vir, 0);
+    if(pte && ((*pte & PTE_U) != 0) && ((*pte & PTE_P) != 0) ){
+      *pte = (*pte) & (~PTE_W) ; //clear write bit 
+      cprintf("\nPTE : 0x%p\n", pte);
+    } 
+    else {
+      return -1;
+    }
+  }
+  // notify register 3 of updated PTE to flush TLB
+  lcr3(V2P(currentproc -> pgdir));  
+  return 0;
+}
+
+// makes PTE both readable and writable
+int
+munprotect(void *addr, int len){
+  struct proc *currentproc = myproc();
+  // check addr points if it is not apart of address space and is not page aligned
+  if (checkaddress((int)addr, len, currentproc->vlimit) == -1){
+    return -1;
+  }
+
+  pte_t *pte;
+  int vir;
+  // page loop
+  for (vir = (int) addr; vir < ((int) addr + (len) *PGSIZE); vir+= PGSIZE){
+    // get the PTE address in current process's pgdir that corresponds to virtual address vir
+    pte = walkpgdir(currentproc->pgdir,(void*) vir, 0);
+    if(pte && ((*pte & PTE_U) != 0) && ((*pte & PTE_P) != 0) ){
+      *pte = (*pte) | (PTE_W) ; //set write bit 
+      cprintf("\nPTE : 0x%p\n", pte);
+    } 
+    else {
+      return -1;
+    }
+  }
+  // notify register 3 of updated PTE to flush TLB
+  lcr3(V2P(currentproc -> pgdir));
   return 0;
 }
 
